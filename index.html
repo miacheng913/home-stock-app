@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f6f1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="家裡有多少" />
+    <meta
+      name="description"
+      content="簡單記錄家中衛生紙、清潔用品與衣物備品的庫存。"
+    />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>家裡有多少</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="today-label"></p>
+          <h1>家裡有多少</h1>
+        </div>
+        <button class="icon-button" id="install-button" type="button" hidden aria-label="安裝 App">
+          <span aria-hidden="true">↓</span>
+        </button>
+      </header>
+
+      <main>
+        <section class="view active" id="home-view" aria-labelledby="home-tab">
+          <div class="summary-card">
+            <div>
+              <p>庫存狀況</p>
+              <strong><span id="total-count">0</span> 種用品</strong>
+            </div>
+            <div class="summary-divider"></div>
+            <div>
+              <p>需要補貨</p>
+              <strong class="warning-text"><span id="low-count">0</span> 種</strong>
+            </div>
+          </div>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">優先處理</p>
+              <h2>快用完了</h2>
+            </div>
+            <button class="text-button" type="button" data-go="shopping">看採購清單</button>
+          </div>
+          <div class="card-list" id="low-stock-list"></div>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">最近更新</p>
+              <h2>家中用品</h2>
+            </div>
+            <button class="text-button" type="button" data-go="inventory">查看全部</button>
+          </div>
+          <div class="card-list" id="recent-list"></div>
+        </section>
+
+        <section class="view" id="inventory-view" aria-labelledby="inventory-tab">
+          <div class="page-heading">
+            <p class="eyebrow">所有物品</p>
+            <h2>庫存</h2>
+          </div>
+          <label class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="search-input" type="search" placeholder="搜尋用品、分類或位置" />
+          </label>
+          <div class="chips" id="category-chips" aria-label="分類篩選"></div>
+          <div class="card-list inventory-list" id="inventory-list"></div>
+        </section>
+
+        <section class="view" id="shopping-view" aria-labelledby="shopping-tab">
+          <div class="page-heading">
+            <p class="eyebrow">自動整理</p>
+            <h2>採購清單</h2>
+            <p class="page-description">庫存低於設定數量時，會自動出現在這裡。</p>
+          </div>
+          <div class="shopping-progress">
+            <span id="shopping-progress-text">尚無待購項目</span>
+            <div class="progress-track"><div id="shopping-progress-bar"></div></div>
+          </div>
+          <div class="card-list" id="shopping-list"></div>
+        </section>
+      </main>
+
+      <button class="fab" id="add-button" type="button" aria-label="新增用品">
+        <span aria-hidden="true">＋</span>
+      </button>
+
+      <nav class="bottom-nav" aria-label="主要選單">
+        <button class="nav-item active" id="home-tab" type="button" data-view="home">
+          <span class="nav-icon" aria-hidden="true">⌂</span>
+          <span>首頁</span>
+        </button>
+        <button class="nav-item" id="inventory-tab" type="button" data-view="inventory">
+          <span class="nav-icon" aria-hidden="true">▦</span>
+          <span>庫存</span>
+        </button>
+        <button class="nav-item" id="shopping-tab" type="button" data-view="shopping">
+          <span class="nav-icon" aria-hidden="true">✓</span>
+          <span>採購</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="modal-backdrop" id="item-modal" hidden>
+      <section class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">用品資料</p>
+            <h2 id="modal-title">新增用品</h2>
+          </div>
+          <button class="icon-button subtle" id="close-modal" type="button" aria-label="關閉">×</button>
+        </div>
+
+        <form id="item-form">
+          <input id="item-id" type="hidden" />
+          <div class="form-grid">
+            <label class="field field-wide">
+              <span>用品名稱</span>
+              <input id="item-name" required maxlength="30" placeholder="例如：抽取式衛生紙" />
+            </label>
+            <label class="field">
+              <span>分類</span>
+              <select id="item-category">
+                <option>日常消耗品</option>
+                <option>清潔用品</option>
+                <option>盥洗用品</option>
+                <option>衣物備品</option>
+                <option>食品</option>
+                <option>其他</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>圖示</span>
+              <select id="item-emoji">
+                <option>🧻</option>
+                <option>🧴</option>
+                <option>🧼</option>
+                <option>🧦</option>
+                <option>🩲</option>
+                <option>🧽</option>
+                <option>📦</option>
+                <option>🍚</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>目前數量</span>
+              <input id="item-quantity" required min="0" step="1" inputmode="numeric" type="number" />
+            </label>
+            <label class="field">
+              <span>單位</span>
+              <select id="item-unit">
+                <option>包</option>
+                <option>瓶</option>
+                <option>盒</option>
+                <option>個</option>
+                <option>雙</option>
+                <option>件</option>
+                <option>罐</option>
+                <option>袋</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>最低庫存</span>
+              <input id="item-minimum" required min="0" step="1" inputmode="numeric" type="number" />
+            </label>
+            <label class="field">
+              <span>存放位置</span>
+              <input id="item-location" maxlength="30" placeholder="例如：儲藏室" />
+            </label>
+            <label class="field field-wide">
+              <span>備註（尺寸、顏色、家人等）</span>
+              <input id="item-note" maxlength="60" placeholder="例如：爸爸／黑色／L" />
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="danger-button" id="delete-button" type="button" hidden>刪除</button>
+            <button class="primary-button" type="submit">儲存用品</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <template id="empty-template">
+      <div class="empty-state">
+        <div class="empty-icon">✓</div>
+        <h3>目前都很充足</h3>
+        <p>庫存不足的用品會顯示在這裡。</p>
+      </div>
+    </template>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>

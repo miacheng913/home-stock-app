@@ -1,0 +1,441 @@
+const STORAGE_KEY = "home-stock-items-v1";
+const CHECKED_KEY = "home-stock-checked-v1";
+
+const starterItems = [
+  {
+    id: "paper",
+    name: "抽取式衛生紙",
+    category: "日常消耗品",
+    emoji: "🧻",
+    quantity: 2,
+    unit: "包",
+    minimum: 3,
+    location: "儲藏室",
+    note: "",
+    updatedAt: Date.now() - 1000,
+  },
+  {
+    id: "shampoo",
+    name: "洗髮精",
+    category: "盥洗用品",
+    emoji: "🧴",
+    quantity: 1,
+    unit: "瓶",
+    minimum: 1,
+    location: "浴室櫃",
+    note: "補充包也算一瓶",
+    updatedAt: Date.now() - 2000,
+  },
+  {
+    id: "socks",
+    name: "爸爸黑襪",
+    category: "衣物備品",
+    emoji: "🧦",
+    quantity: 5,
+    unit: "雙",
+    minimum: 3,
+    location: "主臥衣櫃",
+    note: "黑色／L",
+    updatedAt: Date.now() - 3000,
+  },
+  {
+    id: "underwear",
+    name: "小明新內褲",
+    category: "衣物備品",
+    emoji: "🩲",
+    quantity: 3,
+    unit: "件",
+    minimum: 2,
+    location: "小明衣櫃",
+    note: "藍色／120",
+    updatedAt: Date.now() - 4000,
+  },
+  {
+    id: "detergent",
+    name: "洗衣精",
+    category: "清潔用品",
+    emoji: "🧴",
+    quantity: 2,
+    unit: "瓶",
+    minimum: 1,
+    location: "陽台",
+    note: "",
+    updatedAt: Date.now() - 5000,
+  },
+];
+
+let items = loadJson(STORAGE_KEY, starterItems);
+let checkedItems = new Set(loadJson(CHECKED_KEY, []));
+let activeCategory = "全部";
+let deferredInstallPrompt = null;
+let toastTimer = null;
+
+const elements = {
+  totalCount: document.querySelector("#total-count"),
+  lowCount: document.querySelector("#low-count"),
+  lowStockList: document.querySelector("#low-stock-list"),
+  recentList: document.querySelector("#recent-list"),
+  inventoryList: document.querySelector("#inventory-list"),
+  shoppingList: document.querySelector("#shopping-list"),
+  shoppingProgressText: document.querySelector("#shopping-progress-text"),
+  shoppingProgressBar: document.querySelector("#shopping-progress-bar"),
+  categoryChips: document.querySelector("#category-chips"),
+  searchInput: document.querySelector("#search-input"),
+  itemModal: document.querySelector("#item-modal"),
+  itemForm: document.querySelector("#item-form"),
+  modalTitle: document.querySelector("#modal-title"),
+  deleteButton: document.querySelector("#delete-button"),
+  toast: document.querySelector("#toast"),
+  installButton: document.querySelector("#install-button"),
+};
+
+function loadJson(key, fallback) {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : structuredClone(fallback);
+  } catch {
+    return structuredClone(fallback);
+  }
+}
+
+function saveItems() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function saveChecked() {
+  localStorage.setItem(CHECKED_KEY, JSON.stringify([...checkedItems]));
+}
+
+function isLow(item) {
+  return item.quantity <= item.minimum;
+}
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function itemCard(item) {
+  const low = isLow(item);
+  const detail = [item.location, item.note].filter(Boolean).join(" · ");
+  return `
+    <article class="item-card ${low ? "is-low" : ""}" data-id="${escapeHtml(item.id)}">
+      <div class="item-emoji" aria-hidden="true">${escapeHtml(item.emoji)}</div>
+      <div class="item-main" data-action="edit" tabindex="0" role="button" aria-label="編輯 ${escapeHtml(item.name)}">
+        <div class="item-title-row">
+          <span class="item-title">${escapeHtml(item.name)}</span>
+          ${low ? '<span class="status-dot" title="需要補貨"></span>' : ""}
+        </div>
+        <p class="item-meta">${escapeHtml(detail || item.category)}</p>
+      </div>
+      <div class="stepper" aria-label="${escapeHtml(item.name)}數量">
+        <button type="button" data-action="decrease" aria-label="減少一${escapeHtml(item.unit)}">−</button>
+        <div class="quantity"><strong>${item.quantity}</strong><span>${escapeHtml(item.unit)}</span></div>
+        <button type="button" data-action="increase" aria-label="增加一${escapeHtml(item.unit)}">＋</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderEmpty(title = "目前都很充足", description = "庫存不足的用品會顯示在這裡。") {
+  return `
+    <div class="empty-state">
+      <div class="empty-icon">✓</div>
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(description)}</p>
+    </div>
+  `;
+}
+
+function renderHome() {
+  const lowItems = items.filter(isLow).sort((a, b) => a.quantity - b.quantity);
+  const recentItems = [...items].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4);
+  elements.totalCount.textContent = items.length;
+  elements.lowCount.textContent = lowItems.length;
+  elements.lowStockList.innerHTML = lowItems.length
+    ? lowItems.slice(0, 3).map(itemCard).join("")
+    : renderEmpty();
+  elements.recentList.innerHTML = recentItems.length
+    ? recentItems.map(itemCard).join("")
+    : renderEmpty("還沒有用品", "點右下角的加號建立第一筆庫存。");
+}
+
+function renderCategories() {
+  const categories = ["全部", ...new Set(items.map((item) => item.category))];
+  if (!categories.includes(activeCategory)) activeCategory = "全部";
+  elements.categoryChips.innerHTML = categories
+    .map(
+      (category) => `
+        <button class="chip ${category === activeCategory ? "active" : ""}" type="button" data-category="${escapeHtml(category)}">
+          ${escapeHtml(category)}
+        </button>
+      `,
+    )
+    .join("");
+}
+
+function renderInventory() {
+  const query = elements.searchInput.value.trim().toLocaleLowerCase("zh-Hant");
+  const filtered = items
+    .filter((item) => activeCategory === "全部" || item.category === activeCategory)
+    .filter((item) =>
+      [item.name, item.category, item.location, item.note]
+        .join(" ")
+        .toLocaleLowerCase("zh-Hant")
+        .includes(query),
+    )
+    .sort((a, b) => Number(isLow(b)) - Number(isLow(a)) || b.updatedAt - a.updatedAt);
+  elements.inventoryList.innerHTML = filtered.length
+    ? filtered.map(itemCard).join("")
+    : renderEmpty("找不到用品", "試試其他關鍵字或分類。");
+}
+
+function renderShopping() {
+  const shoppingItems = items.filter(isLow).sort((a, b) => a.quantity - b.quantity);
+  for (const id of checkedItems) {
+    if (!shoppingItems.some((item) => item.id === id)) checkedItems.delete(id);
+  }
+  saveChecked();
+
+  const checkedCount = shoppingItems.filter((item) => checkedItems.has(item.id)).length;
+  const progress = shoppingItems.length ? (checkedCount / shoppingItems.length) * 100 : 0;
+  elements.shoppingProgressText.textContent = shoppingItems.length
+    ? `已完成 ${checkedCount}／${shoppingItems.length} 項`
+    : "尚無待購項目";
+  elements.shoppingProgressBar.style.width = `${progress}%`;
+  elements.shoppingList.innerHTML = shoppingItems.length
+    ? shoppingItems
+        .map(
+          (item) => `
+            <article class="shopping-card ${checkedItems.has(item.id) ? "checked" : ""}" data-id="${escapeHtml(item.id)}">
+              <button class="check-button" type="button" data-action="check" aria-label="標記${escapeHtml(item.name)}">${checkedItems.has(item.id) ? "✓" : ""}</button>
+              <div class="item-emoji" aria-hidden="true">${escapeHtml(item.emoji)}</div>
+              <div class="shopping-copy">
+                <h3>${escapeHtml(item.name)}</h3>
+                <p>剩 ${item.quantity} ${escapeHtml(item.unit)} · 建議至少 ${item.minimum + 1} ${escapeHtml(item.unit)}</p>
+              </div>
+              <button class="restock-button" type="button" data-action="restock">已補貨</button>
+            </article>
+          `,
+        )
+        .join("")
+    : renderEmpty("採購清單是空的", "家中用品目前都高於最低庫存。");
+}
+
+function renderAll() {
+  renderHome();
+  renderCategories();
+  renderInventory();
+  renderShopping();
+}
+
+function updateQuantity(id, difference) {
+  const item = items.find((candidate) => candidate.id === id);
+  if (!item) return;
+  const next = Math.max(0, item.quantity + difference);
+  if (next === item.quantity) {
+    showToast("數量已經是 0");
+    return;
+  }
+  item.quantity = next;
+  item.updatedAt = Date.now();
+  if (!isLow(item)) checkedItems.delete(item.id);
+  saveItems();
+  saveChecked();
+  renderAll();
+  showToast(`${item.name}：${item.quantity} ${item.unit}`);
+}
+
+function handleCardAction(event) {
+  const actionTarget = event.target.closest("[data-action]");
+  const card = event.target.closest("[data-id]");
+  if (!actionTarget || !card) return;
+  const { action } = actionTarget.dataset;
+  const { id } = card.dataset;
+  if (action === "increase") updateQuantity(id, 1);
+  if (action === "decrease") updateQuantity(id, -1);
+  if (action === "edit") openItemModal(id);
+}
+
+function switchView(viewName) {
+  document.querySelectorAll(".view").forEach((view) => {
+    view.classList.toggle("active", view.id === `${viewName}-view`);
+  });
+  document.querySelectorAll(".nav-item").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.view === viewName);
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function openItemModal(id = null) {
+  elements.itemForm.reset();
+  document.querySelector("#item-id").value = id || "";
+  document.querySelector("#item-quantity").value = 1;
+  document.querySelector("#item-minimum").value = 1;
+  elements.modalTitle.textContent = id ? "編輯用品" : "新增用品";
+  elements.deleteButton.hidden = !id;
+
+  if (id) {
+    const item = items.find((candidate) => candidate.id === id);
+    if (!item) return;
+    document.querySelector("#item-name").value = item.name;
+    document.querySelector("#item-category").value = item.category;
+    document.querySelector("#item-emoji").value = item.emoji;
+    document.querySelector("#item-quantity").value = item.quantity;
+    document.querySelector("#item-unit").value = item.unit;
+    document.querySelector("#item-minimum").value = item.minimum;
+    document.querySelector("#item-location").value = item.location;
+    document.querySelector("#item-note").value = item.note;
+  }
+
+  elements.itemModal.hidden = false;
+  document.body.style.overflow = "hidden";
+  window.setTimeout(() => document.querySelector("#item-name").focus(), 80);
+}
+
+function closeItemModal() {
+  elements.itemModal.hidden = true;
+  document.body.style.overflow = "";
+}
+
+function submitItem(event) {
+  event.preventDefault();
+  const id = document.querySelector("#item-id").value;
+  const data = {
+    id: id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: document.querySelector("#item-name").value.trim(),
+    category: document.querySelector("#item-category").value,
+    emoji: document.querySelector("#item-emoji").value,
+    quantity: Math.max(0, Number.parseInt(document.querySelector("#item-quantity").value, 10) || 0),
+    unit: document.querySelector("#item-unit").value,
+    minimum: Math.max(0, Number.parseInt(document.querySelector("#item-minimum").value, 10) || 0),
+    location: document.querySelector("#item-location").value.trim(),
+    note: document.querySelector("#item-note").value.trim(),
+    updatedAt: Date.now(),
+  };
+
+  if (id) {
+    const index = items.findIndex((item) => item.id === id);
+    if (index >= 0) items[index] = data;
+  } else {
+    items.unshift(data);
+  }
+  if (!isLow(data)) checkedItems.delete(data.id);
+  saveItems();
+  saveChecked();
+  renderAll();
+  closeItemModal();
+  showToast(id ? "用品已更新" : "用品已新增");
+}
+
+function deleteCurrentItem() {
+  const id = document.querySelector("#item-id").value;
+  const item = items.find((candidate) => candidate.id === id);
+  if (!item || !window.confirm(`確定要刪除「${item.name}」嗎？`)) return;
+  items = items.filter((candidate) => candidate.id !== id);
+  checkedItems.delete(id);
+  saveItems();
+  saveChecked();
+  renderAll();
+  closeItemModal();
+  showToast("用品已刪除");
+}
+
+function handleShoppingAction(event) {
+  const target = event.target.closest("[data-action]");
+  const card = event.target.closest("[data-id]");
+  if (!target || !card) return;
+  const item = items.find((candidate) => candidate.id === card.dataset.id);
+  if (!item) return;
+  if (target.dataset.action === "check") {
+    checkedItems.has(item.id) ? checkedItems.delete(item.id) : checkedItems.add(item.id);
+    saveChecked();
+    renderShopping();
+  }
+  if (target.dataset.action === "restock") {
+    item.quantity = Math.max(item.quantity, item.minimum + 1);
+    item.updatedAt = Date.now();
+    checkedItems.delete(item.id);
+    saveItems();
+    saveChecked();
+    renderAll();
+    showToast(`${item.name} 已補到 ${item.quantity} ${item.unit}`);
+  }
+}
+
+function showToast(message) {
+  window.clearTimeout(toastTimer);
+  elements.toast.textContent = message;
+  elements.toast.classList.add("show");
+  toastTimer = window.setTimeout(() => elements.toast.classList.remove("show"), 1800);
+}
+
+document.querySelector("#today-label").textContent = new Intl.DateTimeFormat("zh-TW", {
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+}).format(new Date());
+
+document.querySelectorAll(".nav-item").forEach((button) => {
+  button.addEventListener("click", () => switchView(button.dataset.view));
+});
+
+document.querySelectorAll("[data-go]").forEach((button) => {
+  button.addEventListener("click", () => switchView(button.dataset.go));
+});
+
+document.querySelector("#add-button").addEventListener("click", () => openItemModal());
+document.querySelector("#close-modal").addEventListener("click", closeItemModal);
+elements.itemModal.addEventListener("click", (event) => {
+  if (event.target === elements.itemModal) closeItemModal();
+});
+elements.itemForm.addEventListener("submit", submitItem);
+elements.deleteButton.addEventListener("click", deleteCurrentItem);
+elements.searchInput.addEventListener("input", renderInventory);
+elements.categoryChips.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-category]");
+  if (!button) return;
+  activeCategory = button.dataset.category;
+  renderCategories();
+  renderInventory();
+});
+
+[elements.lowStockList, elements.recentList, elements.inventoryList].forEach((list) => {
+  list.addEventListener("click", handleCardAction);
+  list.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") handleCardAction(event);
+  });
+});
+elements.shoppingList.addEventListener("click", handleShoppingAction);
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  elements.installButton.hidden = false;
+});
+
+elements.installButton.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  elements.installButton.hidden = true;
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  elements.installButton.hidden = true;
+  showToast("App 已安裝");
+});
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
+renderAll();

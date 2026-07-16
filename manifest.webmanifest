@@ -1,0 +1,19 @@
+{
+  "name": "家裡有多少｜家庭庫存",
+  "short_name": "家裡有多少",
+  "description": "記錄家中日常消耗用品與衣物備品的庫存。",
+  "lang": "zh-Hant",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f6f1",
+  "theme_color": "#f7f6f1",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
