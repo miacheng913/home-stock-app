@@ -88,6 +88,7 @@ categories = [
   ].filter(Boolean)),
 ];
 let activeCategory = "全部";
+let activeDetailItemId = null;
 let deferredInstallPrompt = null;
 let toastTimer = null;
 
@@ -103,6 +104,7 @@ const elements = {
   categoryChips: document.querySelector("#category-chips"),
   searchInput: document.querySelector("#search-input"),
   itemModal: document.querySelector("#item-modal"),
+  detailModal: document.querySelector("#detail-modal"),
   categoryModal: document.querySelector("#category-modal"),
   itemForm: document.querySelector("#item-form"),
   modalTitle: document.querySelector("#modal-title"),
@@ -116,6 +118,8 @@ const elements = {
   toggleEmojiPicker: document.querySelector("#toggle-emoji-picker"),
   selectedEmoji: document.querySelector("#selected-emoji"),
   categoryManagerList: document.querySelector("#category-manager-list"),
+  variantList: document.querySelector("#variant-list"),
+  itemQuantity: document.querySelector("#item-quantity"),
 };
 
 function loadJson(key, fallback) {
@@ -140,7 +144,21 @@ function saveCategories() {
 }
 
 function isLow(item) {
-  return item.quantity <= item.minimum;
+  return totalQuantity(item) <= item.minimum;
+}
+
+function hasVariants(item) {
+  return Array.isArray(item.variants) && item.variants.length > 0;
+}
+
+function totalQuantity(item) {
+  return hasVariants(item)
+    ? item.variants.reduce((total, variant) => total + Math.max(0, Number(variant.quantity) || 0), 0)
+    : Math.max(0, Number(item.quantity) || 0);
+}
+
+function syncItemQuantity(item) {
+  item.quantity = totalQuantity(item);
 }
 
 function escapeHtml(value = "") {
@@ -154,22 +172,31 @@ function escapeHtml(value = "") {
 
 function itemCard(item) {
   const low = isLow(item);
+  const total = totalQuantity(item);
+  const grouped = hasVariants(item);
   const detail = [item.location, item.note].filter(Boolean).join(" · ");
   return `
     <article class="item-card ${low ? "is-low" : ""}" data-id="${escapeHtml(item.id)}">
       <div class="item-emoji" aria-hidden="true">${escapeHtml(item.emoji)}</div>
-      <div class="item-main" data-action="edit" tabindex="0" role="button" aria-label="編輯 ${escapeHtml(item.name)}">
+      <div class="item-main" data-action="detail" tabindex="0" role="button" aria-label="查看 ${escapeHtml(item.name)}細分庫存">
         <div class="item-title-row">
           <span class="item-title">${escapeHtml(item.name)}</span>
           ${low ? '<span class="status-dot" title="需要補貨"></span>' : ""}
         </div>
-        <p class="item-meta">${escapeHtml(detail || item.category)}</p>
+        <p class="item-meta">${grouped ? `${item.variants.length} 種細分 · ` : ""}${escapeHtml(detail || item.category)}</p>
       </div>
-      <div class="stepper" aria-label="${escapeHtml(item.name)}數量">
-        <button type="button" data-action="decrease" aria-label="減少一${escapeHtml(item.unit)}">−</button>
-        <div class="quantity"><strong>${item.quantity}</strong><span>${escapeHtml(item.unit)}</span></div>
-        <button type="button" data-action="increase" aria-label="增加一${escapeHtml(item.unit)}">＋</button>
-      </div>
+      ${
+        grouped
+          ? `<div class="group-total" data-action="detail" role="button" aria-label="查看細分">
+              <div class="quantity"><strong>${total}</strong><span>${escapeHtml(item.unit)}</span></div>
+              <span class="group-chevron" aria-hidden="true">›</span>
+            </div>`
+          : `<div class="stepper" aria-label="${escapeHtml(item.name)}數量">
+              <button type="button" data-action="decrease" aria-label="減少一${escapeHtml(item.unit)}">−</button>
+              <div class="quantity"><strong>${total}</strong><span>${escapeHtml(item.unit)}</span></div>
+              <button type="button" data-action="increase" aria-label="增加一${escapeHtml(item.unit)}">＋</button>
+            </div>`
+      }
     </article>
   `;
 }
@@ -185,7 +212,7 @@ function renderEmpty(title = "目前都很充足", description = "庫存不足�
 }
 
 function renderHome() {
-  const lowItems = items.filter(isLow).sort((a, b) => a.quantity - b.quantity);
+  const lowItems = items.filter(isLow).sort((a, b) => totalQuantity(a) - totalQuantity(b));
   const recentItems = [...items].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4);
   elements.totalCount.textContent = items.length;
   elements.lowCount.textContent = lowItems.length;
@@ -271,7 +298,7 @@ function renderInventory() {
 }
 
 function renderShopping() {
-  const shoppingItems = items.filter(isLow).sort((a, b) => a.quantity - b.quantity);
+  const shoppingItems = items.filter(isLow).sort((a, b) => totalQuantity(a) - totalQuantity(b));
   for (const id of checkedItems) {
     if (!shoppingItems.some((item) => item.id === id)) checkedItems.delete(id);
   }
@@ -292,9 +319,9 @@ function renderShopping() {
               <div class="item-emoji" aria-hidden="true">${escapeHtml(item.emoji)}</div>
               <div class="shopping-copy">
                 <h3>${escapeHtml(item.name)}</h3>
-                <p>剩 ${item.quantity} ${escapeHtml(item.unit)} · 建議至少 ${item.minimum + 1} ${escapeHtml(item.unit)}</p>
+                <p>剩 ${totalQuantity(item)} ${escapeHtml(item.unit)} · 建議至少 ${item.minimum + 1} ${escapeHtml(item.unit)}</p>
               </div>
-              <button class="restock-button" type="button" data-action="restock">已補貨</button>
+              <button class="restock-button" type="button" data-action="${hasVariants(item) ? "detail" : "restock"}">${hasVariants(item) ? "查看細分" : "已補貨"}</button>
             </article>
           `,
         )
@@ -312,8 +339,8 @@ function renderAll() {
 
 function updateQuantity(id, difference) {
   const item = items.find((candidate) => candidate.id === id);
-  if (!item) return;
-  const next = Math.max(0, item.quantity + difference);
+  if (!item || hasVariants(item)) return;
+  const next = Math.max(0, totalQuantity(item) + difference);
   if (next === item.quantity) {
     showToast("數量已經是 0");
     return;
@@ -335,7 +362,7 @@ function handleCardAction(event) {
   const { id } = card.dataset;
   if (action === "increase") updateQuantity(id, 1);
   if (action === "decrease") updateQuantity(id, -1);
-  if (action === "edit") openItemModal(id);
+  if (action === "detail") openDetailModal(id);
 }
 
 function switchView(viewName) {
@@ -358,6 +385,7 @@ function openItemModal(id = null) {
   document.querySelector("#item-minimum").value = 1;
   elements.modalTitle.textContent = id ? "編輯用品" : "新增用品";
   elements.deleteButton.hidden = !id;
+  elements.itemQuantity.disabled = false;
 
   if (id) {
     const item = items.find((candidate) => candidate.id === id);
@@ -365,7 +393,9 @@ function openItemModal(id = null) {
     document.querySelector("#item-name").value = item.name;
     renderCategoryOptions(item.category);
     renderEmojiPicker(item.emoji);
-    document.querySelector("#item-quantity").value = item.quantity;
+    elements.itemQuantity.value = totalQuantity(item);
+    elements.itemQuantity.disabled = hasVariants(item);
+    elements.itemQuantity.title = hasVariants(item) ? "有細分庫存時，請在細分畫面調整數量" : "";
     document.querySelector("#item-unit").value = item.unit;
     document.querySelector("#item-minimum").value = item.minimum;
     document.querySelector("#item-location").value = item.location;
@@ -379,6 +409,126 @@ function openItemModal(id = null) {
 function closeItemModal() {
   elements.itemModal.hidden = true;
   document.body.style.overflow = "";
+}
+
+function renderVariantList(item) {
+  document.querySelector("#detail-emoji").textContent = item.emoji;
+  document.querySelector("#detail-category").textContent = item.category;
+  document.querySelector("#detail-title").textContent = item.name;
+  document.querySelector("#detail-total").textContent = totalQuantity(item);
+  document.querySelector("#detail-unit").textContent = item.unit;
+  elements.variantList.innerHTML = hasVariants(item)
+    ? item.variants
+        .map(
+          (variant) => `
+            <div class="variant-row" data-variant-id="${escapeHtml(variant.id)}">
+              <input class="variant-name" value="${escapeHtml(variant.name)}" maxlength="24"
+                aria-label="細分名稱：${escapeHtml(variant.name)}" />
+              <div class="variant-stepper" aria-label="${escapeHtml(variant.name)}數量">
+                <button type="button" data-action="variant-decrease" aria-label="減少">−</button>
+                <strong>${Math.max(0, Number(variant.quantity) || 0)}</strong>
+                <button type="button" data-action="variant-increase" aria-label="增加">＋</button>
+              </div>
+              <button class="variant-delete" type="button" data-action="variant-delete" aria-label="刪除此細分">×</button>
+            </div>
+          `,
+        )
+        .join("")
+    : '<div class="variants-empty">尚未建立細分，目前數量可直接在清單調整。</div>';
+}
+
+function openDetailModal(id) {
+  const item = items.find((candidate) => candidate.id === id);
+  if (!item) return;
+  activeDetailItemId = id;
+  renderVariantList(item);
+  document.querySelector("#variant-add-form").reset();
+  document.querySelector("#variant-quantity").value = 1;
+  elements.detailModal.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
+function closeDetailModal() {
+  elements.detailModal.hidden = true;
+  activeDetailItemId = null;
+  document.body.style.overflow = "";
+}
+
+function addVariant(event) {
+  event.preventDefault();
+  const item = items.find((candidate) => candidate.id === activeDetailItemId);
+  if (!item) return;
+  const nameInput = document.querySelector("#variant-name");
+  const quantityInput = document.querySelector("#variant-quantity");
+  const name = nameInput.value.trim();
+  const quantity = Math.max(0, Number.parseInt(quantityInput.value, 10) || 0);
+  if (!name) return;
+  if (!hasVariants(item)) {
+    item.variants = [
+      {
+        id: `${Date.now()}-original`,
+        name: "未分類",
+        quantity: Math.max(0, Number(item.quantity) || 0),
+      },
+    ];
+  }
+  item.variants.push({
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name,
+    quantity,
+  });
+  syncItemQuantity(item);
+  item.updatedAt = Date.now();
+  saveItems();
+  renderAll();
+  renderVariantList(item);
+  nameInput.value = "";
+  quantityInput.value = 1;
+  showToast(`已新增「${name}」`);
+}
+
+function updateVariant(item, variantId, difference) {
+  const variant = item.variants.find((candidate) => candidate.id === variantId);
+  if (!variant) return;
+  variant.quantity = Math.max(0, (Number(variant.quantity) || 0) + difference);
+  syncItemQuantity(item);
+  item.updatedAt = Date.now();
+  if (!isLow(item)) checkedItems.delete(item.id);
+  saveItems();
+  saveChecked();
+  renderAll();
+  renderVariantList(item);
+}
+
+function renameVariant(item, variantId, name) {
+  const variant = item.variants.find((candidate) => candidate.id === variantId);
+  const cleanName = name.trim();
+  if (!variant || !cleanName) {
+    renderVariantList(item);
+    return;
+  }
+  variant.name = cleanName;
+  item.updatedAt = Date.now();
+  saveItems();
+  renderAll();
+  renderVariantList(item);
+}
+
+function deleteVariant(item, variantId) {
+  const variant = item.variants.find((candidate) => candidate.id === variantId);
+  if (!variant || !window.confirm(`確定要刪除「${variant.name}」嗎？`)) return;
+  item.variants = item.variants.filter((candidate) => candidate.id !== variantId);
+  if (item.variants.length === 0) {
+    delete item.variants;
+    item.quantity = 0;
+  } else {
+    syncItemQuantity(item);
+  }
+  item.updatedAt = Date.now();
+  saveItems();
+  renderAll();
+  renderVariantList(item);
+  showToast("細分已刪除");
 }
 
 function openCategoryModal() {
@@ -458,18 +608,22 @@ function deleteCategory(name) {
 function submitItem(event) {
   event.preventDefault();
   const id = document.querySelector("#item-id").value;
+  const existingItem = id ? items.find((item) => item.id === id) : null;
   const data = {
     id: id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name: document.querySelector("#item-name").value.trim(),
     category: elements.itemCategory.value,
     emoji: elements.itemEmoji.value,
-    quantity: Math.max(0, Number.parseInt(document.querySelector("#item-quantity").value, 10) || 0),
+    quantity: existingItem && hasVariants(existingItem)
+      ? totalQuantity(existingItem)
+      : Math.max(0, Number.parseInt(elements.itemQuantity.value, 10) || 0),
     unit: document.querySelector("#item-unit").value,
     minimum: Math.max(0, Number.parseInt(document.querySelector("#item-minimum").value, 10) || 0),
     location: document.querySelector("#item-location").value.trim(),
     note: document.querySelector("#item-note").value.trim(),
     updatedAt: Date.now(),
   };
+  if (existingItem && hasVariants(existingItem)) data.variants = existingItem.variants;
 
   if (id) {
     const index = items.findIndex((item) => item.id === id);
@@ -504,6 +658,9 @@ function handleShoppingAction(event) {
   if (!target || !card) return;
   const item = items.find((candidate) => candidate.id === card.dataset.id);
   if (!item) return;
+  if (target.dataset.action === "detail") {
+    openDetailModal(item.id);
+  }
   if (target.dataset.action === "check") {
     checkedItems.has(item.id) ? checkedItems.delete(item.id) : checkedItems.add(item.id);
     saveChecked();
@@ -543,6 +700,13 @@ document.querySelectorAll("[data-go]").forEach((button) => {
 
 document.querySelector("#add-button").addEventListener("click", () => openItemModal());
 document.querySelector("#close-modal").addEventListener("click", closeItemModal);
+document.querySelector("#close-detail-modal").addEventListener("click", closeDetailModal);
+document.querySelector("#variant-add-form").addEventListener("submit", addVariant);
+document.querySelector("#edit-detail-item").addEventListener("click", () => {
+  const id = activeDetailItemId;
+  closeDetailModal();
+  openItemModal(id);
+});
 document.querySelector("#manage-categories-button").addEventListener("click", openCategoryModal);
 document.querySelector("#close-category-modal").addEventListener("click", closeCategoryModal);
 document.querySelector("#category-add-form").addEventListener("submit", addCategory);
@@ -551,6 +715,9 @@ elements.toggleEmojiPicker.addEventListener("click", () => {
 });
 elements.itemModal.addEventListener("click", (event) => {
   if (event.target === elements.itemModal) closeItemModal();
+});
+elements.detailModal.addEventListener("click", (event) => {
+  if (event.target === elements.detailModal) closeDetailModal();
 });
 elements.categoryModal.addEventListener("click", (event) => {
   if (event.target === elements.categoryModal) closeCategoryModal();
@@ -570,6 +737,21 @@ elements.categoryManagerList.addEventListener("click", (event) => {
   const button = event.target.closest('[data-action="delete-category"]');
   const row = event.target.closest("[data-category]");
   if (button && row) deleteCategory(row.dataset.category);
+});
+elements.variantList.addEventListener("click", (event) => {
+  const row = event.target.closest("[data-variant-id]");
+  const actionTarget = event.target.closest("[data-action]");
+  const item = items.find((candidate) => candidate.id === activeDetailItemId);
+  if (!row || !actionTarget || !item || !hasVariants(item)) return;
+  if (actionTarget.dataset.action === "variant-increase") updateVariant(item, row.dataset.variantId, 1);
+  if (actionTarget.dataset.action === "variant-decrease") updateVariant(item, row.dataset.variantId, -1);
+  if (actionTarget.dataset.action === "variant-delete") deleteVariant(item, row.dataset.variantId);
+});
+elements.variantList.addEventListener("change", (event) => {
+  const row = event.target.closest("[data-variant-id]");
+  const item = items.find((candidate) => candidate.id === activeDetailItemId);
+  if (!row || !item || event.target.tagName !== "INPUT") return;
+  renameVariant(item, row.dataset.variantId, event.target.value);
 });
 elements.itemForm.addEventListener("submit", submitItem);
 elements.deleteButton.addEventListener("click", deleteCurrentItem);

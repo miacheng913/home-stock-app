@@ -277,6 +277,24 @@ main {
   background: var(--green);
 }
 
+.group-total {
+  display: flex;
+  min-width: 64px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  cursor: pointer;
+}
+
+.group-total .quantity {
+  min-width: 42px;
+}
+
+.group-chevron {
+  color: var(--muted);
+  font-size: 22px;
+}
+
 .quantity {
   min-width: 34px;
   text-align: center;
@@ -580,6 +598,152 @@ main {
   margin-bottom: 20px;
 }
 
+.detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.detail-emoji {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  background: var(--surface-muted);
+  place-items: center;
+  font-size: 24px;
+}
+
+.detail-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 17px 18px;
+  border-radius: 18px;
+  color: #fff;
+  background: var(--green);
+}
+
+.detail-summary span {
+  font-size: 13px;
+}
+
+.detail-summary strong {
+  font-size: 22px;
+}
+
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.secondary-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--green);
+  background: var(--green-soft);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.compact-heading {
+  margin-top: 22px;
+}
+
+.variant-list {
+  display: grid;
+  gap: 9px;
+}
+
+.variant-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 9px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.variant-name {
+  min-width: 0;
+  height: 39px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 10px;
+  outline: none;
+  color: var(--ink);
+  background: var(--surface-muted);
+  font-weight: 750;
+}
+
+.variant-stepper {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.variant-stepper button {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface-muted);
+  place-items: center;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.variant-stepper strong {
+  min-width: 25px;
+  text-align: center;
+}
+
+.variant-delete {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--red);
+  background: #f4dfdc;
+  place-items: center;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.variant-add-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 68px auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.variant-add-form input {
+  min-width: 0;
+  height: 45px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  outline: none;
+  background: var(--surface);
+}
+
+.variants-empty {
+  padding: 22px 16px;
+  border: 1px dashed #d4d3cc;
+  border-radius: 16px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -845,5 +1009,13 @@ main {
 @media (max-width: 390px) {
   .emoji-picker {
     grid-template-columns: repeat(7, 1fr);
+  }
+
+  .variant-add-form {
+    grid-template-columns: minmax(0, 1fr) 62px;
+  }
+
+  .variant-add-form button {
+    grid-column: 1 / -1;
   }
 }

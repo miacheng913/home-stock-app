@@ -184,6 +184,42 @@
       </section>
     </div>
 
+    <div class="modal-backdrop" id="detail-modal" hidden>
+      <section class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <div class="detail-heading">
+            <span class="detail-emoji" id="detail-emoji" aria-hidden="true">📦</span>
+            <div>
+              <p class="eyebrow" id="detail-category">用品細分</p>
+              <h2 id="detail-title">用品名稱</h2>
+            </div>
+          </div>
+          <button class="icon-button subtle" id="close-detail-modal" type="button" aria-label="關閉">×</button>
+        </div>
+        <div class="detail-summary">
+          <span>全部庫存</span>
+          <strong><span id="detail-total">0</span> <span id="detail-unit">個</span></strong>
+        </div>
+        <div class="detail-actions">
+          <button class="secondary-button" id="edit-detail-item" type="button">編輯用品資料</button>
+        </div>
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="eyebrow">個別種類</p>
+            <h2>細分庫存</h2>
+          </div>
+        </div>
+        <div class="variant-list" id="variant-list"></div>
+        <form class="variant-add-form" id="variant-add-form">
+          <input id="variant-name" required maxlength="24" placeholder="例如：黑色短襪" />
+          <input id="variant-quantity" required min="0" step="1" inputmode="numeric" type="number" value="1" aria-label="細分數量" />
+          <button class="primary-button compact-button" type="submit">新增細分</button>
+        </form>
+        <p class="category-help">第一次新增細分時，原本的庫存會保留為「未分類」。</p>
+      </section>
+    </div>
+
     <div class="modal-backdrop" id="category-modal" hidden>
       <section class="modal-sheet compact-sheet" role="dialog" aria-modal="true" aria-labelledby="category-modal-title">
         <div class="modal-handle"></div>
