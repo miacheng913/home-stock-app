@@ -112,6 +112,9 @@ const elements = {
   itemCategory: document.querySelector("#item-category"),
   itemEmoji: document.querySelector("#item-emoji"),
   emojiPicker: document.querySelector("#emoji-picker"),
+  emojiPickerField: document.querySelector("#emoji-picker-field"),
+  toggleEmojiPicker: document.querySelector("#toggle-emoji-picker"),
+  selectedEmoji: document.querySelector("#selected-emoji"),
   categoryManagerList: document.querySelector("#category-manager-list"),
 };
 
@@ -220,6 +223,7 @@ function renderCategoryOptions(selected = elements.itemCategory.value) {
 function renderEmojiPicker(selected = elements.itemEmoji.value || "📦") {
   if (!availableEmojis.includes(selected)) availableEmojis.unshift(selected);
   elements.itemEmoji.value = selected;
+  elements.selectedEmoji.textContent = selected;
   elements.emojiPicker.innerHTML = availableEmojis
     .map(
       (emoji) => `
@@ -229,6 +233,11 @@ function renderEmojiPicker(selected = elements.itemEmoji.value || "📦") {
       `,
     )
     .join("");
+}
+
+function setEmojiPickerOpen(open) {
+  elements.emojiPickerField.hidden = !open;
+  elements.toggleEmojiPicker.setAttribute("aria-expanded", String(open));
 }
 
 function renderCategoryManager() {
@@ -343,6 +352,7 @@ function openItemModal(id = null) {
   elements.itemForm.reset();
   renderCategoryOptions(categories[0]);
   renderEmojiPicker("📦");
+  setEmojiPickerOpen(false);
   document.querySelector("#item-id").value = id || "";
   document.querySelector("#item-quantity").value = 1;
   document.querySelector("#item-minimum").value = 1;
@@ -364,7 +374,6 @@ function openItemModal(id = null) {
 
   elements.itemModal.hidden = false;
   document.body.style.overflow = "hidden";
-  window.setTimeout(() => document.querySelector("#item-name").focus(), 80);
 }
 
 function closeItemModal() {
@@ -376,7 +385,6 @@ function openCategoryModal() {
   renderCategoryManager();
   elements.categoryModal.hidden = false;
   document.querySelector("#new-category-name").value = "";
-  window.setTimeout(() => document.querySelector("#new-category-name").focus(), 80);
 }
 
 function closeCategoryModal() {
@@ -538,6 +546,9 @@ document.querySelector("#close-modal").addEventListener("click", closeItemModal)
 document.querySelector("#manage-categories-button").addEventListener("click", openCategoryModal);
 document.querySelector("#close-category-modal").addEventListener("click", closeCategoryModal);
 document.querySelector("#category-add-form").addEventListener("submit", addCategory);
+elements.toggleEmojiPicker.addEventListener("click", () => {
+  setEmojiPickerOpen(elements.emojiPickerField.hidden);
+});
 elements.itemModal.addEventListener("click", (event) => {
   if (event.target === elements.itemModal) closeItemModal();
 });
@@ -548,6 +559,7 @@ elements.emojiPicker.addEventListener("click", (event) => {
   const button = event.target.closest("[data-emoji]");
   if (!button) return;
   renderEmojiPicker(button.dataset.emoji);
+  setEmojiPickerOpen(false);
 });
 elements.categoryManagerList.addEventListener("change", (event) => {
   const row = event.target.closest("[data-category]");

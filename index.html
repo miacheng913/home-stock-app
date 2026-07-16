@@ -134,15 +134,18 @@
               </span>
               <select id="item-category"></select>
             </label>
-            <label class="field">
-              <span>已選圖示</span>
-              <input id="item-emoji" type="text" readonly value="📦" />
-            </label>
-            <div class="field field-wide">
+            <div class="field">
+              <span>圖示</span>
+              <input id="item-emoji" type="hidden" value="📦" />
+              <button class="emoji-change-button" id="toggle-emoji-picker" type="button" aria-expanded="false">
+                <span class="selected-emoji" id="selected-emoji" aria-hidden="true">📦</span>
+                <span>更換圖示</span>
+              </button>
+            </div>
+            <div class="field field-wide emoji-picker-field" id="emoji-picker-field" hidden>
               <span>選擇圖示</span>
               <div class="emoji-picker" id="emoji-picker" role="listbox" aria-label="選擇用品圖示"></div>
             </div>
-            </label>
             <label class="field">
               <span>目前數量</span>
               <input id="item-quantity" required min="0" step="1" inputmode="numeric" type="number" />
