@@ -128,28 +128,20 @@
               <input id="item-name" required maxlength="30" placeholder="例如：抽取式衛生紙" />
             </label>
             <label class="field">
-              <span>分類</span>
-              <select id="item-category">
-                <option>日常消耗品</option>
-                <option>清潔用品</option>
-                <option>盥洗用品</option>
-                <option>衣物備品</option>
-                <option>食品</option>
-                <option>其他</option>
-              </select>
+              <span class="field-title">
+                分類
+                <button class="inline-action" id="manage-categories-button" type="button">管理</button>
+              </span>
+              <select id="item-category"></select>
             </label>
             <label class="field">
-              <span>圖示</span>
-              <select id="item-emoji">
-                <option>🧻</option>
-                <option>🧴</option>
-                <option>🧼</option>
-                <option>🧦</option>
-                <option>🩲</option>
-                <option>🧽</option>
-                <option>📦</option>
-                <option>🍚</option>
-              </select>
+              <span>已選圖示</span>
+              <input id="item-emoji" type="text" readonly value="📦" />
+            </label>
+            <div class="field field-wide">
+              <span>選擇圖示</span>
+              <div class="emoji-picker" id="emoji-picker" role="listbox" aria-label="選擇用品圖示"></div>
+            </div>
             </label>
             <label class="field">
               <span>目前數量</span>
@@ -186,6 +178,25 @@
             <button class="primary-button" type="submit">儲存用品</button>
           </div>
         </form>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="category-modal" hidden>
+      <section class="modal-sheet compact-sheet" role="dialog" aria-modal="true" aria-labelledby="category-modal-title">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">自訂整理方式</p>
+            <h2 id="category-modal-title">管理分類</h2>
+          </div>
+          <button class="icon-button subtle" id="close-category-modal" type="button" aria-label="關閉">×</button>
+        </div>
+        <form class="category-add-form" id="category-add-form">
+          <input id="new-category-name" required maxlength="20" placeholder="輸入新分類名稱" />
+          <button class="primary-button compact-button" type="submit">新增</button>
+        </form>
+        <p class="category-help">點分類名稱可重新命名；刪除有用品的分類時，用品會移到「其他」。</p>
+        <div class="category-manager-list" id="category-manager-list"></div>
       </section>
     </div>
 

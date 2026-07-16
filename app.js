@@ -1,5 +1,16 @@
 const STORAGE_KEY = "home-stock-items-v1";
 const CHECKED_KEY = "home-stock-checked-v1";
+const CATEGORIES_KEY = "home-stock-categories-v1";
+
+const defaultCategories = ["日常消耗品", "清潔用品", "盥洗用品", "衣物備品", "食品", "其他"];
+const availableEmojis = [
+  "🧻", "🧴", "🧼", "🪥", "🦷", "🪒", "🧽", "🧹",
+  "🪣", "🧺", "🧦", "🩲", "👕", "👖", "👚", "👟",
+  "🥿", "🧤", "🧢", "🛏️", "🛁", "🚽", "💊", "🩹",
+  "🍚", "🍞", "🥛", "🥚", "🥫", "🍜", "☕", "🧂",
+  "🍼", "👶", "🐶", "🐱", "🐾", "🔋", "💡", "🕯️",
+  "🗑️", "🛍️", "📦", "✏️", "📒", "🧰", "🔧", "🪴",
+];
 
 const starterItems = [
   {
@@ -66,6 +77,16 @@ const starterItems = [
 
 let items = loadJson(STORAGE_KEY, starterItems);
 let checkedItems = new Set(loadJson(CHECKED_KEY, []));
+let categories = loadJson(CATEGORIES_KEY, [
+  ...new Set([...defaultCategories, ...items.map((item) => item.category)]),
+]);
+categories = [
+  ...new Set([
+    ...(Array.isArray(categories) ? categories : defaultCategories),
+    ...items.map((item) => item.category),
+    "其他",
+  ].filter(Boolean)),
+];
 let activeCategory = "全部";
 let deferredInstallPrompt = null;
 let toastTimer = null;
@@ -82,11 +103,16 @@ const elements = {
   categoryChips: document.querySelector("#category-chips"),
   searchInput: document.querySelector("#search-input"),
   itemModal: document.querySelector("#item-modal"),
+  categoryModal: document.querySelector("#category-modal"),
   itemForm: document.querySelector("#item-form"),
   modalTitle: document.querySelector("#modal-title"),
   deleteButton: document.querySelector("#delete-button"),
   toast: document.querySelector("#toast"),
   installButton: document.querySelector("#install-button"),
+  itemCategory: document.querySelector("#item-category"),
+  itemEmoji: document.querySelector("#item-emoji"),
+  emojiPicker: document.querySelector("#emoji-picker"),
+  categoryManagerList: document.querySelector("#category-manager-list"),
 };
 
 function loadJson(key, fallback) {
@@ -104,6 +130,10 @@ function saveItems() {
 
 function saveChecked() {
   localStorage.setItem(CHECKED_KEY, JSON.stringify([...checkedItems]));
+}
+
+function saveCategories() {
+  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
 }
 
 function isLow(item) {
@@ -165,14 +195,51 @@ function renderHome() {
 }
 
 function renderCategories() {
-  const categories = ["全部", ...new Set(items.map((item) => item.category))];
-  if (!categories.includes(activeCategory)) activeCategory = "全部";
-  elements.categoryChips.innerHTML = categories
+  const filterCategories = ["全部", ...categories];
+  if (!filterCategories.includes(activeCategory)) activeCategory = "全部";
+  elements.categoryChips.innerHTML = filterCategories
     .map(
       (category) => `
         <button class="chip ${category === activeCategory ? "active" : ""}" type="button" data-category="${escapeHtml(category)}">
           ${escapeHtml(category)}
         </button>
+      `,
+    )
+    .join("");
+}
+
+function renderCategoryOptions(selected = elements.itemCategory.value) {
+  elements.itemCategory.innerHTML = categories
+    .map(
+      (category) =>
+        `<option value="${escapeHtml(category)}"${category === selected ? " selected" : ""}>${escapeHtml(category)}</option>`,
+    )
+    .join("");
+}
+
+function renderEmojiPicker(selected = elements.itemEmoji.value || "📦") {
+  if (!availableEmojis.includes(selected)) availableEmojis.unshift(selected);
+  elements.itemEmoji.value = selected;
+  elements.emojiPicker.innerHTML = availableEmojis
+    .map(
+      (emoji) => `
+        <button class="emoji-option ${emoji === selected ? "selected" : ""}" type="button"
+          data-emoji="${escapeHtml(emoji)}" role="option" aria-selected="${emoji === selected}"
+          aria-label="選擇 ${escapeHtml(emoji)}">${escapeHtml(emoji)}</button>
+      `,
+    )
+    .join("");
+}
+
+function renderCategoryManager() {
+  elements.categoryManagerList.innerHTML = categories
+    .map(
+      (category) => `
+        <div class="category-row" data-category="${escapeHtml(category)}">
+          <input value="${escapeHtml(category)}" maxlength="20" aria-label="分類名稱：${escapeHtml(category)}" />
+          <button class="category-delete" type="button" data-action="delete-category"
+            ${category === "其他" ? "disabled" : ""} aria-label="刪除 ${escapeHtml(category)}">×</button>
+        </div>
       `,
     )
     .join("");
@@ -229,6 +296,7 @@ function renderShopping() {
 function renderAll() {
   renderHome();
   renderCategories();
+  renderCategoryOptions();
   renderInventory();
   renderShopping();
 }
@@ -273,6 +341,8 @@ function switchView(viewName) {
 
 function openItemModal(id = null) {
   elements.itemForm.reset();
+  renderCategoryOptions(categories[0]);
+  renderEmojiPicker("📦");
   document.querySelector("#item-id").value = id || "";
   document.querySelector("#item-quantity").value = 1;
   document.querySelector("#item-minimum").value = 1;
@@ -283,8 +353,8 @@ function openItemModal(id = null) {
     const item = items.find((candidate) => candidate.id === id);
     if (!item) return;
     document.querySelector("#item-name").value = item.name;
-    document.querySelector("#item-category").value = item.category;
-    document.querySelector("#item-emoji").value = item.emoji;
+    renderCategoryOptions(item.category);
+    renderEmojiPicker(item.emoji);
     document.querySelector("#item-quantity").value = item.quantity;
     document.querySelector("#item-unit").value = item.unit;
     document.querySelector("#item-minimum").value = item.minimum;
@@ -302,14 +372,89 @@ function closeItemModal() {
   document.body.style.overflow = "";
 }
 
+function openCategoryModal() {
+  renderCategoryManager();
+  elements.categoryModal.hidden = false;
+  document.querySelector("#new-category-name").value = "";
+  window.setTimeout(() => document.querySelector("#new-category-name").focus(), 80);
+}
+
+function closeCategoryModal() {
+  elements.categoryModal.hidden = true;
+  renderCategoryOptions(elements.itemCategory.value);
+}
+
+function addCategory(event) {
+  event.preventDefault();
+  const input = document.querySelector("#new-category-name");
+  const name = input.value.trim();
+  if (!name) return;
+  if (categories.includes(name)) {
+    showToast("這個分類已經存在");
+    input.select();
+    return;
+  }
+  categories.push(name);
+  saveCategories();
+  renderCategoryManager();
+  renderCategories();
+  renderCategoryOptions(name);
+  input.value = "";
+  input.focus();
+  showToast(`已新增「${name}」`);
+}
+
+function renameCategory(oldName, newName) {
+  const cleanName = newName.trim();
+  if (!cleanName || cleanName === oldName) {
+    renderCategoryManager();
+    return;
+  }
+  if (categories.includes(cleanName)) {
+    showToast("這個分類已經存在");
+    renderCategoryManager();
+    return;
+  }
+  categories = categories.map((category) => (category === oldName ? cleanName : category));
+  items.forEach((item) => {
+    if (item.category === oldName) item.category = cleanName;
+  });
+  if (activeCategory === oldName) activeCategory = cleanName;
+  saveCategories();
+  saveItems();
+  renderAll();
+  renderCategoryManager();
+  showToast(`已改名為「${cleanName}」`);
+}
+
+function deleteCategory(name) {
+  if (name === "其他") return;
+  const usedCount = items.filter((item) => item.category === name).length;
+  const message = usedCount
+    ? `「${name}」中有 ${usedCount} 項用品，刪除後會移到「其他」。確定刪除嗎？`
+    : `確定要刪除分類「${name}」嗎？`;
+  if (!window.confirm(message)) return;
+  if (!categories.includes("其他")) categories.push("其他");
+  categories = categories.filter((category) => category !== name);
+  items.forEach((item) => {
+    if (item.category === name) item.category = "其他";
+  });
+  if (activeCategory === name) activeCategory = "全部";
+  saveCategories();
+  saveItems();
+  renderAll();
+  renderCategoryManager();
+  showToast("分類已刪除");
+}
+
 function submitItem(event) {
   event.preventDefault();
   const id = document.querySelector("#item-id").value;
   const data = {
     id: id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name: document.querySelector("#item-name").value.trim(),
-    category: document.querySelector("#item-category").value,
-    emoji: document.querySelector("#item-emoji").value,
+    category: elements.itemCategory.value,
+    emoji: elements.itemEmoji.value,
     quantity: Math.max(0, Number.parseInt(document.querySelector("#item-quantity").value, 10) || 0),
     unit: document.querySelector("#item-unit").value,
     minimum: Math.max(0, Number.parseInt(document.querySelector("#item-minimum").value, 10) || 0),
@@ -390,8 +535,29 @@ document.querySelectorAll("[data-go]").forEach((button) => {
 
 document.querySelector("#add-button").addEventListener("click", () => openItemModal());
 document.querySelector("#close-modal").addEventListener("click", closeItemModal);
+document.querySelector("#manage-categories-button").addEventListener("click", openCategoryModal);
+document.querySelector("#close-category-modal").addEventListener("click", closeCategoryModal);
+document.querySelector("#category-add-form").addEventListener("submit", addCategory);
 elements.itemModal.addEventListener("click", (event) => {
   if (event.target === elements.itemModal) closeItemModal();
+});
+elements.categoryModal.addEventListener("click", (event) => {
+  if (event.target === elements.categoryModal) closeCategoryModal();
+});
+elements.emojiPicker.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-emoji]");
+  if (!button) return;
+  renderEmojiPicker(button.dataset.emoji);
+});
+elements.categoryManagerList.addEventListener("change", (event) => {
+  const row = event.target.closest("[data-category]");
+  if (!row || event.target.tagName !== "INPUT") return;
+  renameCategory(row.dataset.category, event.target.value);
+});
+elements.categoryManagerList.addEventListener("click", (event) => {
+  const button = event.target.closest('[data-action="delete-category"]');
+  const row = event.target.closest("[data-category]");
+  if (button && row) deleteCategory(row.dataset.category);
 });
 elements.itemForm.addEventListener("submit", submitItem);
 elements.deleteButton.addEventListener("click", deleteCurrentItem);

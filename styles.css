@@ -601,6 +601,22 @@ main {
   font-weight: 700;
 }
 
+.field-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inline-action {
+  padding: 0;
+  border: 0;
+  color: var(--green);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .field input,
 .field select {
   width: 100%;
@@ -617,6 +633,98 @@ main {
 .field select:focus {
   border-color: var(--green);
   box-shadow: 0 0 0 3px rgba(53, 95, 74, 0.1);
+}
+
+.emoji-picker {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+}
+
+.emoji-option {
+  display: grid;
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: var(--surface-muted);
+  place-items: center;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.emoji-option.selected {
+  border-color: var(--green);
+  background: var(--green-soft);
+  box-shadow: 0 0 0 2px rgba(53, 95, 74, 0.1);
+}
+
+.compact-sheet {
+  max-height: 78vh;
+}
+
+.category-add-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+}
+
+.category-add-form input,
+.category-row input {
+  min-width: 0;
+  height: 47px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  outline: none;
+  background: var(--surface);
+}
+
+.compact-button {
+  min-height: 47px;
+  padding-inline: 18px;
+}
+
+.category-help {
+  margin: 11px 2px 14px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.category-manager-list {
+  display: grid;
+  gap: 8px;
+}
+
+.category-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.category-delete {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--red);
+  background: #f4dfdc;
+  place-items: center;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.category-delete:disabled {
+  color: #aaa;
+  background: var(--surface-muted);
+  cursor: not-allowed;
 }
 
 .form-actions {
@@ -706,5 +814,11 @@ main {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .emoji-picker {
+    grid-template-columns: repeat(7, 1fr);
   }
 }
