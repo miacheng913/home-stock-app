@@ -632,6 +632,13 @@ main {
   font-size: 22px;
 }
 
+.threshold-mode-note {
+  margin: 8px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
 .detail-actions {
   display: flex;
   justify-content: flex-end;
@@ -668,6 +675,28 @@ main {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface);
+}
+
+.variant-row.individual-mode {
+  grid-template-columns: minmax(0, 1fr) 72px auto auto;
+}
+
+.variant-minimum {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.variant-minimum input {
+  width: 72px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  outline: none;
+  background: var(--surface-muted);
+  text-align: center;
 }
 
 .variant-name {
@@ -723,6 +752,10 @@ main {
   grid-template-columns: minmax(0, 1fr) 68px auto;
   gap: 8px;
   margin-top: 12px;
+}
+
+.variant-add-form.individual-mode {
+  grid-template-columns: minmax(0, 1fr) 68px 68px auto;
 }
 
 .variant-add-form input {
@@ -1015,7 +1048,20 @@ main {
     grid-template-columns: minmax(0, 1fr) 62px;
   }
 
+  .variant-add-form.individual-mode {
+    grid-template-columns: minmax(0, 1fr) 62px 62px;
+  }
+
   .variant-add-form button {
     grid-column: 1 / -1;
+  }
+
+  .variant-row.individual-mode {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .variant-row.individual-mode .variant-minimum {
+    grid-column: 1 / 2;
+    grid-row: 2;
   }
 }

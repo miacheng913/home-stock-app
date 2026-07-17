@@ -120,6 +120,8 @@ const elements = {
   categoryManagerList: document.querySelector("#category-manager-list"),
   variantList: document.querySelector("#variant-list"),
   itemQuantity: document.querySelector("#item-quantity"),
+  itemThresholdMode: document.querySelector("#item-threshold-mode"),
+  variantMinimum: document.querySelector("#variant-minimum"),
 };
 
 function loadJson(key, fallback) {
@@ -144,7 +146,33 @@ function saveCategories() {
 }
 
 function isLow(item) {
+  if (usesVariantMinimum(item)) {
+    return item.variants.some(
+      (variant) => Math.max(0, Number(variant.quantity) || 0) <= variantMinimum(item, variant),
+    );
+  }
   return totalQuantity(item) <= item.minimum;
+}
+
+function usesVariantMinimum(item) {
+  return hasVariants(item) && item.stockThresholdMode === "variants";
+}
+
+function variantMinimum(item, variant) {
+  const value = Number(variant.minimum);
+  return Number.isFinite(value) && value >= 0 ? value : Math.max(0, Number(item.minimum) || 0);
+}
+
+function lowStockDescription(item) {
+  if (!usesVariantMinimum(item)) {
+    return `剩 ${totalQuantity(item)} ${item.unit} · 建議至少 ${item.minimum + 1} ${item.unit}`;
+  }
+  const lowVariants = item.variants.filter(
+    (variant) => Math.max(0, Number(variant.quantity) || 0) <= variantMinimum(item, variant),
+  );
+  const names = lowVariants.slice(0, 2).map((variant) => variant.name).join("、");
+  const more = lowVariants.length > 2 ? `等 ${lowVariants.length} 種` : "";
+  return `${names}${more}需要補貨`;
 }
 
 function hasVariants(item) {
@@ -319,7 +347,7 @@ function renderShopping() {
               <div class="item-emoji" aria-hidden="true">${escapeHtml(item.emoji)}</div>
               <div class="shopping-copy">
                 <h3>${escapeHtml(item.name)}</h3>
-                <p>剩 ${totalQuantity(item)} ${escapeHtml(item.unit)} · 建議至少 ${item.minimum + 1} ${escapeHtml(item.unit)}</p>
+                <p>${escapeHtml(lowStockDescription(item))}</p>
               </div>
               <button class="restock-button" type="button" data-action="${hasVariants(item) ? "detail" : "restock"}">${hasVariants(item) ? "查看細分" : "已補貨"}</button>
             </article>
@@ -386,6 +414,7 @@ function openItemModal(id = null) {
   elements.modalTitle.textContent = id ? "編輯用品" : "新增用品";
   elements.deleteButton.hidden = !id;
   elements.itemQuantity.disabled = false;
+  elements.itemThresholdMode.value = "total";
 
   if (id) {
     const item = items.find((candidate) => candidate.id === id);
@@ -398,6 +427,7 @@ function openItemModal(id = null) {
     elements.itemQuantity.title = hasVariants(item) ? "有細分庫存時，請在細分畫面調整數量" : "";
     document.querySelector("#item-unit").value = item.unit;
     document.querySelector("#item-minimum").value = item.minimum;
+    elements.itemThresholdMode.value = item.stockThresholdMode === "variants" ? "variants" : "total";
     document.querySelector("#item-location").value = item.location;
     document.querySelector("#item-note").value = item.note;
   }
@@ -412,18 +442,32 @@ function closeItemModal() {
 }
 
 function renderVariantList(item) {
+  const individualMode = usesVariantMinimum(item);
   document.querySelector("#detail-emoji").textContent = item.emoji;
   document.querySelector("#detail-category").textContent = item.category;
   document.querySelector("#detail-title").textContent = item.name;
   document.querySelector("#detail-total").textContent = totalQuantity(item);
   document.querySelector("#detail-unit").textContent = item.unit;
+  document.querySelector("#detail-threshold-mode").textContent = individualMode
+    ? "目前使用分開統計，每個細分各自判斷"
+    : `目前使用合計統計，最低庫存 ${item.minimum} ${item.unit}`;
+  document.querySelector("#variant-add-form").classList.toggle("individual-mode", individualMode);
+  elements.variantMinimum.hidden = !individualMode;
   elements.variantList.innerHTML = hasVariants(item)
     ? item.variants
         .map(
           (variant) => `
-            <div class="variant-row" data-variant-id="${escapeHtml(variant.id)}">
+            <div class="variant-row ${individualMode ? "individual-mode" : ""}" data-variant-id="${escapeHtml(variant.id)}">
               <input class="variant-name" value="${escapeHtml(variant.name)}" maxlength="24"
                 aria-label="細分名稱：${escapeHtml(variant.name)}" />
+              ${
+                individualMode
+                  ? `<label class="variant-minimum">最低
+                      <input class="variant-minimum-input" type="number" min="0" step="1" inputmode="numeric"
+                        value="${variantMinimum(item, variant)}" aria-label="${escapeHtml(variant.name)}最低庫存" />
+                    </label>`
+                  : ""
+              }
               <div class="variant-stepper" aria-label="${escapeHtml(variant.name)}數量">
                 <button type="button" data-action="variant-decrease" aria-label="減少">−</button>
                 <strong>${Math.max(0, Number(variant.quantity) || 0)}</strong>
@@ -444,6 +488,7 @@ function openDetailModal(id) {
   renderVariantList(item);
   document.querySelector("#variant-add-form").reset();
   document.querySelector("#variant-quantity").value = 1;
+  elements.variantMinimum.value = Math.max(0, Number(item.minimum) || 0);
   elements.detailModal.hidden = false;
   document.body.style.overflow = "hidden";
 }
@@ -462,6 +507,7 @@ function addVariant(event) {
   const quantityInput = document.querySelector("#variant-quantity");
   const name = nameInput.value.trim();
   const quantity = Math.max(0, Number.parseInt(quantityInput.value, 10) || 0);
+  const minimum = Math.max(0, Number.parseInt(elements.variantMinimum.value, 10) || 0);
   if (!name) return;
   if (!hasVariants(item)) {
     item.variants = [
@@ -469,6 +515,7 @@ function addVariant(event) {
         id: `${Date.now()}-original`,
         name: "未分類",
         quantity: Math.max(0, Number(item.quantity) || 0),
+        minimum: Math.max(0, Number(item.minimum) || 0),
       },
     ];
   }
@@ -476,6 +523,7 @@ function addVariant(event) {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name,
     quantity,
+    minimum,
   });
   syncItemQuantity(item);
   item.updatedAt = Date.now();
@@ -485,6 +533,18 @@ function addVariant(event) {
   nameInput.value = "";
   quantityInput.value = 1;
   showToast(`已新增「${name}」`);
+}
+
+function updateVariantMinimum(item, variantId, minimum) {
+  const variant = item.variants.find((candidate) => candidate.id === variantId);
+  if (!variant) return;
+  variant.minimum = Math.max(0, Number.parseInt(minimum, 10) || 0);
+  item.updatedAt = Date.now();
+  if (!isLow(item)) checkedItems.delete(item.id);
+  saveItems();
+  saveChecked();
+  renderAll();
+  renderVariantList(item);
 }
 
 function updateVariant(item, variantId, difference) {
@@ -619,11 +679,17 @@ function submitItem(event) {
       : Math.max(0, Number.parseInt(elements.itemQuantity.value, 10) || 0),
     unit: document.querySelector("#item-unit").value,
     minimum: Math.max(0, Number.parseInt(document.querySelector("#item-minimum").value, 10) || 0),
+    stockThresholdMode: elements.itemThresholdMode.value === "variants" ? "variants" : "total",
     location: document.querySelector("#item-location").value.trim(),
     note: document.querySelector("#item-note").value.trim(),
     updatedAt: Date.now(),
   };
-  if (existingItem && hasVariants(existingItem)) data.variants = existingItem.variants;
+  if (existingItem && hasVariants(existingItem)) {
+    data.variants = existingItem.variants.map((variant) => ({
+      ...variant,
+      minimum: variantMinimum(data, variant),
+    }));
+  }
 
   if (id) {
     const index = items.findIndex((item) => item.id === id);
@@ -751,7 +817,11 @@ elements.variantList.addEventListener("change", (event) => {
   const row = event.target.closest("[data-variant-id]");
   const item = items.find((candidate) => candidate.id === activeDetailItemId);
   if (!row || !item || event.target.tagName !== "INPUT") return;
-  renameVariant(item, row.dataset.variantId, event.target.value);
+  if (event.target.classList.contains("variant-minimum-input")) {
+    updateVariantMinimum(item, row.dataset.variantId, event.target.value);
+  } else {
+    renameVariant(item, row.dataset.variantId, event.target.value);
+  }
 });
 elements.itemForm.addEventListener("submit", submitItem);
 elements.deleteButton.addEventListener("click", deleteCurrentItem);

@@ -167,6 +167,13 @@
               <span>最低庫存</span>
               <input id="item-minimum" required min="0" step="1" inputmode="numeric" type="number" />
             </label>
+            <label class="field field-wide">
+              <span>最低庫存計算方式</span>
+              <select id="item-threshold-mode">
+                <option value="total">合計統計：所有細分加總後判斷</option>
+                <option value="variants">分開統計：每個細分各自判斷</option>
+              </select>
+            </label>
             <label class="field">
               <span>存放位置</span>
               <input id="item-location" maxlength="30" placeholder="例如：儲藏室" />
@@ -201,6 +208,7 @@
           <span>全部庫存</span>
           <strong><span id="detail-total">0</span> <span id="detail-unit">個</span></strong>
         </div>
+        <p class="threshold-mode-note" id="detail-threshold-mode">目前使用合計最低庫存</p>
         <div class="detail-actions">
           <button class="secondary-button" id="edit-detail-item" type="button">編輯用品資料</button>
         </div>
@@ -214,6 +222,7 @@
         <form class="variant-add-form" id="variant-add-form">
           <input id="variant-name" required maxlength="24" placeholder="例如：黑色短襪" />
           <input id="variant-quantity" required min="0" step="1" inputmode="numeric" type="number" value="1" aria-label="細分數量" />
+          <input id="variant-minimum" min="0" step="1" inputmode="numeric" type="number" value="1" placeholder="最低" aria-label="細分最低庫存" hidden />
           <button class="primary-button compact-button" type="submit">新增細分</button>
         </form>
         <p class="category-help">第一次新增細分時，原本的庫存會保留為「未分類」。</p>
